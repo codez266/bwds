@@ -27,17 +27,21 @@ import sys
 import traceback
 import json
 import time
+import pdb
 from importlib import import_module
 from collections import OrderedDict
 # TODO: User argparse
 
-from revscoring.extractors import APIExtractor
-from revscoring.datasources import diff
+from revscoring.extractors import api as rapi
+#from revscoring.datasources import diff
+from revscoring.features import wikitext
+from revscoring.languages import english
 
 from mw import api
+import mwapi
 from mw.lib import reverts
 
-base_file_path = '/data/project/dexbot/pywikibot-core/something_'
+base_file_path = '.'
 
 
 class Edit(object):
@@ -187,8 +191,8 @@ def import_from_path(path):
     attribute_name = parts[-1]
 
     module = import_module(module_path)
-
-    attribute = getattr(module, attribute_name)
+    attribute = english
+    #attribute = getattr(module, attribute_name)
 
     return attribute
 
@@ -212,21 +216,23 @@ def handle_args():
 
 
 def bot_gen(rev_pages, language, api_url):
-
-    session = api.Session(api_url)
-    extractor = APIExtractor(session, language=language)
+    #session = mwapi.Session(api_url, user_agent='revscoring')
+    #extractor = api.Extractor(session)
+    session = mwapi.Session(api_url)
+    session2 = api.Session(api_url)
+    extractor = rapi.Extractor(session)
 
     for rev_id, page_id in rev_pages:
         sys.stderr.write(".")
         sys.stderr.flush()
         try:
-
             # Detect reverted status
-            revert = reverts.api.check(session, rev_id, page_id, radius=3)
+            revert = reverts.api.check(session2, rev_id, page_id, radius=3)
             reverted = revert is not None
-            added_words = list(
-                extractor.extract(rev_id, [diff.added_words]))[0]
-            yield Edit(rev_id, added_words, reverted)
+            if reverted:
+                added_words = list(
+                    extractor.extract(int(rev_id), [wikitext.revision.diff.datasources.words_added]))[0]
+                yield Edit(rev_id, added_words, reverted)
 
         except KeyboardInterrupt:
             sys.stderr.write("\n^C Caught.  Exiting...")
